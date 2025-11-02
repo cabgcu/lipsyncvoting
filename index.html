@@ -11,6 +11,7 @@
 
 <!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
+
 <!-- FingerprintJS -->
 <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs/dist/fp.min.js"></script>
 
@@ -19,10 +20,11 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { initializeAppCheck, ReCaptchaV3Provider } 
-  from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app-check.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app-check.js";
 
-/* Firebase Config */
+/* ======================
+   Firebase Configuration
+   ====================== */
 const firebaseConfig = {
   apiKey: "AIzaSyBoYf1_IhILJ96Y9KMcwrVjHMFLT5YEKuQ",
   authDomain: "lip-sync-2025.firebaseapp.com",
@@ -33,6 +35,16 @@ const firebaseConfig = {
   measurementId: "G-NQ0GMG05Q2"
 };
 
+/* Initialize Firebase */
+const app = initializeApp(firebaseConfig);
+
+/* ✅ Initialize App Check (reCAPTCHA v3) */
+const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),
+  isTokenAutoRefreshEnabled: true
+});
+
+/* Globals */
 let db, auth, userId;
 let visitorId = null;
 let selectedVoteId = null;
@@ -126,6 +138,7 @@ async function submitVote(voteId, btn) {
   } catch (e) {
     btn.disabled = false;
     btn.textContent = "Vote Failed – Retry";
+    console.error(e);
   }
 }
 
@@ -138,7 +151,8 @@ function initApp() {
       startButton.disabled = false;
       startButton.classList.add("glow");
       await restoreVoteIfExists(); // restore previous vote
-    });
+    })
+    .catch(() => console.warn("Fingerprint init failed"));
 
   startButton.addEventListener("click", () => setScreen("voting-screen"));
   performersContainer.addEventListener("click", handleCardSelection);
@@ -150,15 +164,7 @@ function initApp() {
   });
 }
 
-/* Firebase Init */
-const app = initializeApp(firebaseConfig);
-
-/* ✅ Add App Check (reCAPTCHA v3) */
-const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),
-  isTokenAutoRefreshEnabled: true
-});
-
+/* Firebase Auth + Firestore */
 db = getFirestore(app);
 auth = getAuth(app);
 onAuthStateChanged(auth, u => {
@@ -173,6 +179,7 @@ onAuthStateChanged(auth, u => {
 signInAnonymously(auth).catch(console.error);
 </script>
 
+<!-- Styles -->
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 html, body {
@@ -181,9 +188,18 @@ html, body {
   color: white; overflow: hidden;
   background-color: black;
 }
-#bg-video { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 0; opacity: 0.8; }
+#bg-video {
+  position: fixed; top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  object-fit: cover; z-index: 0; opacity: 0.8;
+}
 .screen, .glass-card { position: relative; z-index: 1; }
-.glass-card { background: rgba(0,0,0,0.45); backdrop-filter: blur(24px); border-radius: 1.5rem; border: 1px solid rgba(255,255,255,0.15); }
+.glass-card {
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(24px);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255,255,255,0.15);
+}
 @keyframes pink-green-glow {
   0% { box-shadow: 0 0 15px 2px rgba(255,105,180,0.7); }
   50% { box-shadow: 0 0 25px 5px rgba(96,163,77,0.9); }
@@ -201,10 +217,23 @@ button.glow { animation: pink-green-glow 8s ease-in-out infinite; }
   box-shadow: 0 0 12px 2px rgba(34,197,94,0.6);
   transition: all 0.3s ease;
 }
-.spinner { border:3px solid rgba(255,255,255,0.15); border-top-color:#fff; border-radius:50%; width:22px;height:22px; animation:spin .9s linear infinite; margin:0 auto; }
+.spinner {
+  border:3px solid rgba(255,255,255,0.15);
+  border-top-color:#fff;
+  border-radius:50%;
+  width:22px;height:22px;
+  animation:spin .9s linear infinite;
+  margin:0 auto;
+}
 @keyframes spin{to{transform:rotate(360deg)}}
-#performers-container { overflow-y: auto; max-height: 60vh; padding-right: 4px; }
-.screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+#performers-container {
+  overflow-y: auto; max-height: 60vh; padding-right: 4px;
+}
+.screen {
+  position: fixed; inset: 0;
+  display: flex; align-items: center;
+  justify-content: center; padding: 1rem;
+}
 </style>
 </head>
 
@@ -232,15 +261,37 @@ button.glow { animation: pink-green-glow 8s ease-in-out infinite; }
     <img class="w-full max-w-[180px] mx-auto mb-4" src="https://i.imgur.com/EnuWGLA.png" alt="Header">
     <h3 class="text-xl font-semibold mb-2">Vote For Your Favorite Lip Sync Team!</h3>
     <p class="text-white/70 text-sm mb-4">Each attendee may submit only one vote per device.</p>
+
     <div id="performers-container" class="space-y-4 flex-1">
-      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option1"><img src="https://i.imgur.com/DIyK2zX.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2"><h4 class="text-lg font-semibold">Below</h4></div>
-      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option2"><img src="https://i.imgur.com/s7Unz9r.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2"><h4 class="text-lg font-semibold">Deliverance</h4></div>
-      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option3"><img src="https://i.imgur.com/x0BI8Mc.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2"><h4 class="text-lg font-semibold">Mask Off</h4></div>
-      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option4"><img src="https://i.imgur.com/4rG47gL.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2"><h4 class="text-lg font-semibold">Metro Motion</h4></div>
-      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option5"><img src="https://i.imgur.com/k75mMUz.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2"><h4 class="text-lg font-semibold">Sin Games</h4></div>
-      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option6"><img src="https://i.imgur.com/3dJQFeX.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2"><h4 class="text-lg font-semibold">Anonymity</h4></div>
+      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option1">
+        <img src="https://i.imgur.com/DIyK2zX.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2">
+        <h4 class="text-lg font-semibold">Below</h4>
+      </div>
+      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option2">
+        <img src="https://i.imgur.com/s7Unz9r.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2">
+        <h4 class="text-lg font-semibold">Deliverance</h4>
+      </div>
+      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option3">
+        <img src="https://i.imgur.com/x0BI8Mc.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2">
+        <h4 class="text-lg font-semibold">Mask Off</h4>
+      </div>
+      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option4">
+        <img src="https://i.imgur.com/4rG47gL.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2">
+        <h4 class="text-lg font-semibold">Metro Motion</h4>
+      </div>
+      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option5">
+        <img src="https://i.imgur.com/k75mMUz.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2">
+        <h4 class="text-lg font-semibold">Sin Games</h4>
+      </div>
+      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="option6">
+        <img src="https://i.imgur.com/3dJQFeX.jpeg" class="w-full aspect-video object-cover rounded-lg mb-2">
+        <h4 class="text-lg font-semibold">Anonymity</h4>
+      </div>
     </div>
-    <button id="submit-vote-btn" class="mt-6 w-full py-3 px-8 text-base bg-black border border-white/50 text-white rounded-xl transition disabled:opacity-40" disabled>Select a Performer to Vote</button>
+
+    <button id="submit-vote-btn" class="mt-6 w-full py-3 px-8 text-base bg-black border border-white/50 text-white rounded-xl transition disabled:opacity-40" disabled>
+      Select a Performer to Vote
+    </button>
   </div>
 </div>
 
