@@ -117,27 +117,38 @@ function handleCardSelection(e) {
   submitVoteButton.classList.add("ready");
 }
 
+/* ========= Updated Submit Vote ========= */
 async function submitVote(voteId, btn) {
-  if (!visitorId) return;
-  if (!votingEnabled) {
-    alert("Voting is currently closed.");
-    return;
-  }
-  if (!userId) return;
+  if (!visitorId) return alert("Fingerprint not ready.");
+  if (!votingEnabled) return alert("Voting is currently closed.");
+  if (!userId) return alert("Not authenticated.");
 
   btn.disabled = true;
   btn.textContent = "Submitting...";
 
   try {
     const voteRef = doc(db, "lip_sync_2025_votes", userId);
-    const voteData = {
+    const snap = await getDoc(voteRef);
+
+    if (snap.exists()) {
+      // Already voted
+      confirmationImage.src = performerData[snap.data().voteId]?.img || "";
+      confirmationMessage.innerHTML = `
+        You already voted for <b>${performerData[snap.data().voteId]?.name || "a team"}</b>.<br><br>
+        Thank you for attending <b>Lip Sync: For Good!</b>
+      `;
+      setScreen("confirmation-screen");
+      return;
+    }
+
+    await setDoc(voteRef, {
       voteId,
       createdAt: Date.now(),
       userId,
       fingerprint: visitorId,
       userAgent: navigator.userAgent
-    };
-    await setDoc(voteRef, voteData);
+    });
+
     confirmationImage.src = selectedVoteImage;
     confirmationMessage.innerHTML = `
       Your vote for <b>${selectedVoteName}</b> has been recorded.<br><br>
@@ -148,9 +159,11 @@ async function submitVote(voteId, btn) {
     console.error("Submit error:", e);
     btn.disabled = false;
     btn.textContent = "Vote Failed – Retry";
+    alert("There was a problem saving your vote.");
   }
 }
 
+/* ========= Initialize ========= */
 function initializeAppLogic() {
   if (appInitialized) return;
   appInitialized = true;
