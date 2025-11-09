@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Lip Sync 2025 Voting (Online)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Lip Sync 2025 Online Voting</title>
 
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 
-<!-- Tailwind (development CDN) -->
+<!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
 
 <!-- FingerprintJS -->
@@ -19,8 +19,8 @@
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app-check.js";
 
 /* ========= Firebase Config ========= */
@@ -35,12 +35,14 @@ const firebaseConfig = {
 };
 
 /* ========= Globals ========= */
-let db, auth, userId = null, visitorId = null;
-let selectedVoteId = null, selectedVoteName = "", selectedVoteImage = "";
-let appInitialized = false, votingEnabled = true;
-let authMethod = null, verifiedStudentId = null; 
+let db, auth, userId, visitorId = null;
+let selectedVoteId = null;
+let selectedVoteName = "";
+let selectedVoteImage = "";
+let appInitialized = false;
+let votingEnabled = true;
 
-/* ========= Performer Data ========= */
+/* ========= Performers ========= */
 const performerData = {
   option1: { name: "Below", img: "https://i.imgur.com/DIyK2zX.jpeg" },
   option2: { name: "Deliverance", img: "https://i.imgur.com/s7Unz9r.jpeg" },
@@ -50,192 +52,182 @@ const performerData = {
   option6: { name: "Anonymity", img: "https://i.imgur.com/3dJQFeX.jpeg" },
 };
 
-/* ========= Geofences ========= */
-const geofences = [
-  { minLat: 33.508268, maxLat: 33.511748, minLong: -112.130755, maxLong: -112.126984 },
-  { minLat: 33.512279, maxLat: 33.512623, minLong: -112.130699, maxLong: -112.130440 },
-  { minLat: 33.6786695, maxLat: 33.6789695, minLong: -112.256548, maxLong: -112.256248 }
-];
+/* ========= DOM Elements ========= */
+let performersContainer, submitVoteButton, confirmationMessage, confirmationImage;
 
-/* ========= DOM refs ========= */
-let locationError, locationButton, performersContainer, submitVoteButton, confirmationMessage, confirmationImage;
-
-/* ========= Startup ========= */
-document.addEventListener("DOMContentLoaded", () => {
-  locationError = document.getElementById("location-error");
-  locationButton = document.getElementById("location-btn");
+/* ========= Init ========= */
+document.addEventListener("DOMContentLoaded", async () => {
   performersContainer = document.getElementById("performers-container");
   submitVoteButton = document.getElementById("submit-vote-btn");
   confirmationMessage = document.getElementById("confirmation-message");
   confirmationImage = document.getElementById("confirmation-image");
 
-  try {
-    const app = initializeApp(firebaseConfig);
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),
-      isTokenAutoRefreshEnabled: true
-    });
-    db = getFirestore(app);
-    auth = getAuth(app);
-    initializeVotingApp();
-  } catch (e) {
-    console.error("Firebase init error:", e);
-    document.body.innerHTML = "<h2 style='color:white;text-align:center'>Error initializing app. Please refresh.</h2>";
-  }
+  const app = initializeApp(firebaseConfig);
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),
+    isTokenAutoRefreshEnabled: true
+  });
+  db = getFirestore(app);
+  auth = getAuth(app);
+
+  initializeAppLogic();
 });
 
-/* ========= Core Functions ========= */
+/* ========= Helper Functions ========= */
 function setScreen(id) {
   document.querySelectorAll(".screen").forEach(el => el.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
 
-function isInsideGeofence(lat, long) {
-  return geofences.some(({minLat,maxLat,minLong,maxLong}) =>
-    lat >= minLat && lat <= maxLat && long >= minLong && long <= maxLong
-  );
-}
-
 function showError(msg) {
-  locationError.textContent = msg;
-  locationError.classList.add("text-red-400", "font-semibold");
+  const el = document.getElementById("vote-error");
+  el.textContent = msg;
+  el.classList.add("text-red-400", "font-bold");
 }
 
-/* ========= Voting ========= */
-async function submitVote(voteId, btn) {
-  if (!userId) return showError("Authentication not ready, please wait...");
-  if (!visitorId) return showError("Fingerprint not ready.");
-  if (!votingEnabled) return showError("Voting is closed.");
-  btn.disabled = true; btn.textContent = "Submitting...";
-
-  try {
-    const voteRef = doc(db, "lip_sync_2025_votes", userId);
-    await setDoc(voteRef, {
-      voteId,
-      userId,
-      fingerprint: visitorId,
-      userAgent: navigator.userAgent,
-      voteSource: "online",   // ✅ new field
-      createdAt: Date.now(),
-    });
-    confirmationImage.src = performerData[voteId].img;
+/* ========= Restore Vote ========= */
+async function restoreVoteIfExists() {
+  if (!userId || !db) return;
+  const snap = await getDoc(doc(db, "lip_sync_2025_votes", userId));
+  if (snap.exists()) {
+    const performer = performerData[snap.data().voteId];
+    confirmationImage.src = performer.img;
     confirmationMessage.innerHTML = `
-      Your vote for <b>${performerData[voteId].name}</b> has been recorded.<br><br>
-      Thank you for participating online!`;
+      Your vote for <b>${performer.name}</b> has been recorded.<br><br>
+      Thank you for watching <b>Lip Sync: For Good!</b>
+    `;
     setScreen("confirmation-screen");
-  } catch (e) {
-    console.error("Submit error:", e);
-    showError("Error submitting vote: " + e.message);
-    btn.disabled = false;
-    btn.textContent = "Try Again";
+  } else {
+    setScreen("voting-screen");
   }
 }
 
-/* ========= UI Handlers ========= */
+/* ========= Card Selection ========= */
 function handleCardSelection(e) {
   const card = e.target.closest(".performer-card");
-  if (!card) return;
+  if (!card || !votingEnabled) return;
   document.querySelectorAll(".performer-card").forEach(c => c.classList.remove("selected"));
   card.classList.add("selected");
   selectedVoteId = card.dataset.voteId;
-  selectedVoteName = performerData[selectedVoteId].name;
-  selectedVoteImage = performerData[selectedVoteId].img;
+  selectedVoteName = card.querySelector("h4").textContent;
+  selectedVoteImage = card.querySelector("img").src;
   submitVoteButton.disabled = false;
   submitVoteButton.textContent = `Submit Vote for ${selectedVoteName}`;
   submitVoteButton.classList.add("ready");
 }
 
-/* ========= App Init ========= */
-function initializeVotingApp() {
+/* ========= Submit Vote ========= */
+async function submitVote(voteId, btn) {
+  if (!visitorId) return showError("Fingerprint not ready.");
+  if (!votingEnabled) return showError("Voting is currently closed.");
+  if (!userId) return showError("User not authenticated.");
+
+  btn.disabled = true;
+  btn.textContent = "Submitting...";
+
+  try {
+    const voteRef = doc(db, "lip_sync_2025_votes", userId);
+    const voteData = {
+      voteId,
+      createdAt: Date.now(),
+      userId,
+      fingerprint: visitorId,
+      voteSource: "online",
+      userAgent: navigator.userAgent
+    };
+    await setDoc(voteRef, voteData);
+
+    confirmationImage.src = selectedVoteImage;
+    confirmationMessage.innerHTML = `
+      Your vote for <b>${selectedVoteName}</b> has been recorded.<br><br>
+      Thank you for watching <b>Lip Sync: For Good!</b>
+    `;
+    setScreen("confirmation-screen");
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "Vote Failed – Retry";
+    showError("Error saving vote: " + e.message);
+  }
+}
+
+/* ========= Main App Logic ========= */
+function initializeAppLogic() {
   if (appInitialized) return;
   appInitialized = true;
 
-  // Load FingerprintJS
-  FingerprintJS.load()
-    .then(fp => fp.get())
-    .then(r => visitorId = r.visitorId)
-    .catch(() => showError("Fingerprint service failed. Refresh page."));
-
-  // Auth flow
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      userId = user.uid;
-      console.log("Anonymous user ready:", userId);
-      submitVoteButton.disabled = true; // keep disabled until a performer is chosen
-    } else {
-      signInAnonymously(auth).catch(err => {
-        console.error("Anonymous sign-in failed:", err);
-        showError("Could not connect to voting service.");
-      });
-    }
+  FingerprintJS.load().then(fp => fp.get()).then(r => {
+    visitorId = r.visitorId;
   });
 
-  // Event listeners
   performersContainer.addEventListener("click", handleCardSelection);
   submitVoteButton.addEventListener("click", () => submitVote(selectedVoteId, submitVoteButton));
 
-  // Fetch voting state
   const settingsRef = doc(db, "lip_sync_2025_settings", "state");
-  onSnapshot(settingsRef, snap => {
-    if (snap.exists()) votingEnabled = snap.data().enabled;
+  onSnapshot(settingsRef, (snap) => { if (snap.exists()) votingEnabled = snap.data().enabled; });
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      userId = user.uid;
+      const ref = doc(db, "lip_sync_2025_votes", userId);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        console.log("Old UID already voted, refreshing anonymous session...");
+        await signOut(auth);
+        await new Promise(r => setTimeout(r, 1000));
+        await signInAnonymously(auth);
+        return;
+      }
+      await restoreVoteIfExists();
+    } else {
+      await signInAnonymously(auth).catch(err => showError("Could not connect: " + err.message));
+    }
   });
 }
 </script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-body {
-  margin: 0; background: black; color: white; font-family: 'Inter', sans-serif;
-}
-#bg-video { position: fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1; opacity:0.8; }
-.glass-card { background: rgba(0,0,0,0.45); backdrop-filter: blur(20px);
-  border-radius: 1.5rem; border:1px solid rgba(255,255,255,0.15); padding:2rem; text-align:center; }
-.performer-card.selected { border:2px solid #22c55e; box-shadow:0 0 18px rgba(34,197,94,0.5); }
-#submit-vote-btn.ready { background:#22c55e; color:black; border:none;
-  box-shadow:0 0 12px 2px rgba(34,197,94,0.6); transition: all .3s ease; }
-.screen { display:flex; justify-content:center; align-items:center; height:100vh; padding:1rem; }
-.hidden { display:none !important; }
-.spinner { border:3px solid rgba(255,255,255,0.2); border-top-color:#fff; border-radius:50%; width:22px;height:22px;
-  animation:spin .9s linear infinite; margin:0 auto; }
-@keyframes spin { to { transform: rotate(360deg); } }
+html, body { margin:0; height:100%; font-family:'Inter',sans-serif; color:white; overflow:hidden; background:black; }
+#bg-video { position:fixed; top:0; left:0; width:100vw; height:100vh; object-fit:cover; z-index:0; opacity:0.8; }
+.glass-card { background:rgba(0,0,0,0.45); backdrop-filter:blur(24px); border-radius:1.5rem; border:1px solid rgba(255,255,255,0.15); }
+.performer-card.selected { border:2px solid #22c55e; box-shadow:0 0 20px 3px rgba(34,197,94,0.5); }
+#submit-vote-btn.ready { background:#22c55e !important; color:black !important; border:none !important; box-shadow:0 0 12px 2px rgba(34,197,94,0.6); transition:all .3s ease; }
 </style>
 </head>
 
 <body>
-<video autoplay loop muted playsinline id="bg-video" src="https://i.imgur.com/mAzP2S1.mp4"></video>
+<video autoplay muted playsinline loop preload="auto" id="bg-video" src="https://i.imgur.com/mAzP2S1.mp4"></video>
 
-<!-- Login / Start -->
-<div id="login-screen" class="screen">
-  <div class="glass-card w-11/12 max-w-md">
-    <img src="https://i.imgur.com/EnuWGLA.png" class="w-full max-w-[200px] mx-auto mb-6" alt="Header" />
-    <p id="location-error" class="text-white/70 text-base mb-6">Please wait while we connect...</p>
-    <button id="location-btn" class="hidden"></button>
-    <p class="text-white/70 text-sm mt-6">Voting is for registered attendees only.</p>
-  </div>
-</div>
-
-<!-- Voting -->
-<div id="voting-screen" class="screen hidden">
-  <div class="glass-card w-11/12 max-w-md">
-    <img src="https://i.imgur.com/EnuWGLA.png" class="w-full max-w-[200px] mx-auto mb-4" alt="Header" />
-    <h3 class="text-xl font-semibold mb-4">Vote For Your Favorite Lip Sync Team!</h3>
-    <div id="performers-container" class="space-y-4 mb-4">
-      ${Object.entries(performerData).map(([id, p]) => `
-      <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="${id}">
-        <img src="${p.img}" class="w-full aspect-video object-cover rounded-lg mb-2" alt="${p.name}">
-        <h4 class="text-lg font-semibold">${p.name}</h4>
-      </div>`).join('')}
+<!-- VOTING SCREEN -->
+<div id="voting-screen" class="screen flex items-center justify-center p-4">
+  <div class="glass-card p-6 w-11/12 max-w-md text-center">
+    <img src="https://i.imgur.com/EnuWGLA.png" class="w-full max-w-[200px] mx-auto mb-4">
+    <p class="text-white/70 mb-4">Each person may vote only once per device.</p>
+    <p id="vote-error" class="text-sm text-white/70 mb-4"></p>
+    <div id="performers-container" class="space-y-3 overflow-y-auto" style="max-height:60vh;">
+      ${Object.entries({
+        option1:"Below",
+        option2:"Deliverance",
+        option3:"Mask Off",
+        option4:"Metro Motion",
+        option5:"Sin Game",
+        option6:"Anonymity"
+      }).map(([id,name])=>`
+      <div class="performer-card bg-white/5 border border-white/10 p-3 rounded-xl cursor-pointer" data-vote-id="${id}">
+        <img src="${performerData[id].img}" class="w-full aspect-video object-cover rounded-lg mb-2">
+        <h4 class="text-lg font-semibold">${name}</h4>
+      </div>`).join("")}
     </div>
-    <button id="submit-vote-btn" disabled class="w-full py-3 px-8 bg-black border border-white/50 text-white rounded-xl">Select a Performer to Vote</button>
+    <button id="submit-vote-btn" class="mt-6 w-full py-3 bg-black border border-white/50 text-white rounded-xl" disabled>Select a Performer to Vote</button>
   </div>
 </div>
 
-<!-- Confirmation -->
-<div id="confirmation-screen" class="screen hidden">
-  <div class="glass-card w-11/12 max-w-sm">
+<!-- CONFIRMATION -->
+<div id="confirmation-screen" class="screen hidden flex items-center justify-center p-4">
+  <div class="glass-card p-8 w-11/12 max-w-md text-center">
     <h3 class="text-3xl font-bold mb-4 text-white">✅ Submission Received!</h3>
     <img id="confirmation-image" class="w-full max-w-[240px] mx-auto rounded-xl mb-6" alt="Team Image">
-    <p id="confirmation-message" class="text-white text-base mb-4"></p>
+    <p id="confirmation-message" class="text-white text-base mb-6"></p>
   </div>
 </div>
 </body>
