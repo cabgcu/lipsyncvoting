@@ -30,8 +30,6 @@ html,body{margin:0;height:100%;font-family:'Inter',sans-serif;color:white;overfl
 button.glow{animation:pink-green-glow 8s ease-in-out infinite;}
 .performer-card.selected{border:2px solid #22c55e;box-shadow:0 0 20px 3px rgba(34,197,94,0.5);}
 #submit-vote-btn.ready{background:#22c55e!important;color:black!important;border:none!important;box-shadow:0 0 12px 2px rgba(34,197,94,0.6);transition:all .3s ease;}
-.spinner{border:3px solid rgba(255,255,255,0.15);border-top-color:#fff;border-radius:50%;width:22px;height:22px;animation:spin .9s linear infinite;margin:0 auto;}
-@keyframes spin{to{transform:rotate(360deg)}}
 #performers-container{overflow-y:auto;padding-right:4px;}
 #performers-container::-webkit-scrollbar{display:none;}
 .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:1;transition:opacity .3s ease;}
@@ -110,7 +108,8 @@ document.addEventListener("DOMContentLoaded",()=>initializeFirebase());
 async function initializeFirebase(){
   const app=initializeApp(firebaseConfig);
   initializeAppCheck(app,{provider:new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),isTokenAutoRefreshEnabled:true});
-  db=getFirestore(app);auth=getAuth(app);
+  db=getFirestore(app);
+  auth=getAuth(app);
   initializeAppLogic();
 }
 
@@ -127,8 +126,13 @@ function handleCardSelection(e){
   const c=e.target.closest(".performer-card");if(!c)return;
   document.querySelectorAll(".performer-card").forEach(x=>x.classList.remove("selected"));
   c.classList.add("selected");
-  selectedVoteId=c.dataset.voteId;selectedVoteName=performerData[selectedVoteId].name;selectedVoteImage=performerData[selectedVoteId].img;
-  const b=document.getElementById("submit-vote-btn");b.disabled=false;b.textContent=`Submit Vote for ${selectedVoteName}`;b.classList.add("ready");
+  selectedVoteId=c.dataset.voteId;
+  selectedVoteName=performerData[selectedVoteId].name;
+  selectedVoteImage=performerData[selectedVoteId].img;
+  const b=document.getElementById("submit-vote-btn");
+  b.disabled=false;
+  b.textContent=`Submit Vote for ${selectedVoteName}`;
+  b.classList.add("ready");
 }
 
 async function submitVote(voteId,btn){
@@ -154,6 +158,31 @@ async function submitVote(voteId,btn){
       setScreen("confirmation-screen");
     }else alert("Error submitting vote. Please refresh.");
   }
+}
+
+async function restoreVoteIfExists(){
+  if(!userId||!db)return;
+  await new Promise(r=>setTimeout(r,300)); // wait for auth stabilization
+  try{
+    const s=await getDoc(doc(db,"lip_sync_2025_votes",userId));
+    if(s.exists()){
+      const v=s.data().voteId;const p=performerData[v];
+      document.getElementById("confirmation-image").src=p.img;
+      document.getElementById("confirmation-message").innerHTML=`Your vote for <b>${p.name}</b> has been recorded.<br><br>Thank you for watching <b>Lip Sync: For Good!</b>`;
+      setScreen("confirmation-screen");
+    }else await restoreVoteByDeviceHash();
+  }catch{setScreen("login-screen");}
+}
+
+async function restoreVoteByDeviceHash(){
+  if(!deviceHash)return setScreen("login-screen");
+  const s=await getDoc(doc(db,"voted_fingerprints",deviceHash));
+  if(s.exists()){
+    const p=performerData[s.data().voteId];
+    document.getElementById("confirmation-image").src=p.img;
+    document.getElementById("confirmation-message").innerHTML=`This device has already voted for <b>${p.name}</b>.<br><br>Thank you for watching <b>Lip Sync: For Good!</b>`;
+    setScreen("confirmation-screen");
+  }else setScreen("login-screen");
 }
 
 async function initializeAppLogic(){
@@ -192,30 +221,6 @@ async function initializeAppLogic(){
       <img src="${img}" class="w-full aspect-video object-cover rounded-lg mb-2" alt="${name}">
       <h4 class="text-lg font-semibold">${name}</h4>
     </div>`).join('');
-}
-
-async function restoreVoteIfExists(){
-  if(!userId||!db)return;
-  try{
-    const s=await getDoc(doc(db,"lip_sync_2025_votes",userId));
-    if(s.exists()){
-      const v=s.data().voteId;const p=performerData[v];
-      document.getElementById("confirmation-image").src=p.img;
-      document.getElementById("confirmation-message").innerHTML=`Your vote for <b>${p.name}</b> has been recorded.<br><br>Thank you for watching <b>Lip Sync: For Good!</b>`;
-      setScreen("confirmation-screen");
-    }else await restoreVoteByDeviceHash();
-  }catch{setScreen("login-screen");}
-}
-
-async function restoreVoteByDeviceHash(){
-  if(!deviceHash)return setScreen("login-screen");
-  const s=await getDoc(doc(db,"voted_fingerprints",deviceHash));
-  if(s.exists()){
-    const p=performerData[s.data().voteId];
-    document.getElementById("confirmation-image").src=p.img;
-    document.getElementById("confirmation-message").innerHTML=`This device has already voted for <b>${p.name}</b>.<br><br>Thank you for watching <b>Lip Sync: For Good!</b>`;
-    setScreen("confirmation-screen");
-  }else setScreen("login-screen");
 }
 </script>
 </body>
