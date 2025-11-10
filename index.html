@@ -11,32 +11,30 @@
 
 <!-- Tailwind -->
 <script defer src="https://cdn.tailwindcss.com"></script>
+
 <!-- FingerprintJS -->
 <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs/dist/fp.min.js"></script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-html,body{margin:0;min-height:100%;background:black;color:white;font-family:'Inter',sans-serif;
-  overflow-x:hidden;-webkit-user-select:none;touch-action:manipulation;}
+html,body{margin:0;height:100%;background:black;color:white;font-family:'Inter',sans-serif;
+overflow-x:hidden;-webkit-user-select:none;touch-action:manipulation;}
 #bg-video{position:fixed;top:0;left:0;width:100vw;height:100vh;object-fit:cover;z-index:0;opacity:.8;}
 .screen{position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;
-  flex-direction:column;padding:2rem 1rem;z-index:10;}
+flex-direction:column;padding:2rem 1rem;z-index:10;}
 .glass-card{background:rgba(0,0,0,.45);backdrop-filter:blur(20px);border-radius:1.25rem;
-  border:1px solid rgba(255,255,255,.15);width:100%;max-width:420px;overflow:hidden;}
-@keyframes pink-green-glow{
-  0%{box-shadow:0 0 10px 1px rgba(255,105,180,.6);}
-  50%{box-shadow:0 0 18px 3px rgba(96,163,77,.8);}
-  100%{box-shadow:0 0 10px 1px rgba(255,105,180,.6);}
-}
+border:1px solid rgba(255,255,255,.15);width:100%;max-width:420px;overflow:hidden;}
+@keyframes pink-green-glow{0%{box-shadow:0 0 10px 1px rgba(255,105,180,.6);}
+50%{box-shadow:0 0 18px 3px rgba(96,163,77,.8);}
+100%{box-shadow:0 0 10px 1px rgba(255,105,180,.6);}}
 button.glow{animation:pink-green-glow 6s ease-in-out infinite;}
 .performer-card.selected{border:2px solid #22c55e;box-shadow:0 0 20px 3px rgba(34,197,94,.5);}
 #submit-vote-btn.ready{background:#22c55e!important;color:black!important;border:none!important;
-  box-shadow:0 0 10px 2px rgba(34,197,94,.6);transition:all .3s ease;}
+box-shadow:0 0 10px 2px rgba(34,197,94,.6);transition:all .3s ease;}
 .spinner{border:3px solid rgba(255,255,255,.15);border-top-color:#fff;border-radius:50%;
-  width:22px;height:22px;animation:spin .9s linear infinite;margin:0 auto;}
+width:22px;height:22px;animation:spin .9s linear infinite;margin:0 auto;}
 @keyframes spin{to{transform:rotate(360deg)}}
 .hidden{opacity:0!important;pointer-events:none;}
-#voting-screen{overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .vertical-image{width:100%;height:auto;border-radius:0.75rem;}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
 </style>
@@ -50,7 +48,8 @@ button.glow{animation:pink-green-glow 6s ease-in-out infinite;}
 <!-- NAME ENTRY -->
 <div id="name-screen" class="screen">
   <div class="glass-card flex flex-col items-center text-center p-6 w-11/12 max-w-md shadow-2xl my-4">
-    <img class="w-full max-w-[240px] mb-4 opacity-0 transition-all duration-500" id="header-logo" src="https://i.imgur.com/EnuWGLA.png" alt="Lip Sync Header">
+    <img class="w-full max-w-[240px] mb-4 opacity-0 transition-all duration-500" id="header-logo"
+         src="https://i.imgur.com/EnuWGLA.png" alt="Lip Sync Header">
     <h2 class="text-xl font-bold mb-2">Welcome to Lip Sync 2025!</h2>
     <p class="text-white/70 text-base mb-6 max-w-sm">Enter your name to begin voting for your favorite team.</p>
     <input id="name-input" type="text" placeholder="Enter Your Name"
@@ -74,8 +73,8 @@ button.glow{animation:pink-green-glow 6s ease-in-out infinite;}
     <h3 id="voting-header" class="text-xl font-semibold mb-2">Vote For Your Favorite Team!</h3>
     <p id="voting-subtext" class="text-white/70 text-sm mb-3">Each viewer may submit only one vote per device.</p>
     <div id="performers-container"
-         class="space-y-3 flex-1 min-h-[40vh] max-h-[55vh] overflow-y-auto -mr-1 pr-2
-         scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent rounded-xl"></div>
+      class="space-y-3 flex-1 min-h-[40vh] max-h-[55vh] overflow-y-auto -mr-1 pr-2
+      scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent rounded-xl"></div>
     <button id="submit-vote-btn"
       class="mt-5 w-full py-3 px-6 text-base bg-black border border-white/50 text-white rounded-xl transition disabled:opacity-40"
       disabled>Select a Performer to Vote</button>
@@ -107,7 +106,7 @@ const firebaseConfig={
   measurementId:"G-NQ0GMG05Q2"
 };
 
-let db,auth,userId,deviceHash=null,votingEnabled=true,userName="";
+let db,auth,userId,deviceHash=null,userName="",votingEnabled=true;
 const performers={
   option1:{name:"Below",img:"https://i.imgur.com/DIyK2zX.jpeg"},
   option2:{name:"Deliverance",img:"https://i.imgur.com/s7Unz9r.jpeg"},
@@ -121,40 +120,39 @@ document.addEventListener("DOMContentLoaded",()=>initializeFirebase());
 
 async function initializeFirebase(){
   const app=initializeApp(firebaseConfig);
-  initializeAppCheck(app,{provider:new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),isTokenAutoRefreshEnabled:true});
+  initializeAppCheck(app,{
+    provider:new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),
+    isTokenAutoRefreshEnabled:true
+  });
   db=getFirestore(app);auth=getAuth(app);
-  await waitForAuth();
-  await new Promise(r=>setTimeout(r,500));
+
+  // Force refresh for stale sessions
+  onAuthStateChanged(auth,async(u)=>{
+    if(u){userId=u.uid;}
+    else await signInAnonymously(auth);
+  });
+
   deviceHash=await generateDeviceHash();
   unlockContinueButton();
 
-  // 🔥 Voting Closed Handler
-  const sRef = doc(db,"lip_sync_2025_settings","state");
+  const sRef=doc(db,"lip_sync_2025_settings","state");
   onSnapshot(sRef,(s)=>{
     if(s.exists()){
       votingEnabled=s.data().enabled;
-      if(!votingEnabled){
-        const header=document.getElementById("voting-header");
-        const sub=document.getElementById("voting-subtext");
-        const cont=document.getElementById("performers-container");
-        const btn=document.getElementById("submit-vote-btn");
-        header.textContent="Voting Is Now Closed!";
-        sub.textContent="Thank you for joining Lip Sync: For Good!";
-        cont.innerHTML=`<div class='p-2'><img src='https://i.imgur.com/kWKvSbS.jpeg' class='vertical-image mx-auto' alt='Voting Closed'></div>`;
-        btn.disabled=true;
-        btn.textContent="Voting Closed";
-      }
+      if(!votingEnabled)closeVotingUI();
     }
   });
 }
 
-function waitForAuth(){
-  return new Promise(resolve=>{
-    onAuthStateChanged(auth,async u=>{
-      if(u){userId=u.uid;resolve();}
-      else await signInAnonymously(auth);
-    });
-  });
+function closeVotingUI(){
+  const header=document.getElementById("voting-header");
+  const sub=document.getElementById("voting-subtext");
+  const cont=document.getElementById("performers-container");
+  const btn=document.getElementById("submit-vote-btn");
+  header.textContent="Voting Is Now Closed!";
+  sub.textContent="Thank you for joining Lip Sync: For Good!";
+  cont.innerHTML=`<div class='p-2'><img src='https://i.imgur.com/kWKvSbS.jpeg' class='vertical-image mx-auto' alt='Voting Closed'></div>`;
+  btn.disabled=true;btn.textContent="Voting Closed";
 }
 
 async function generateDeviceHash(){
@@ -164,6 +162,11 @@ async function generateDeviceHash(){
     r.components.platform?.value||"",r.components.vendor?.value||""].join("|");
   const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(traits));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+function setScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
 }
 
 function unlockContinueButton(){
@@ -197,10 +200,10 @@ function showVoting(){
   setScreen("voting-screen");
   const cont=document.getElementById("performers-container");
   cont.innerHTML=Object.entries(performers).map(([id,{name,img}])=>`
-  <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="${id}">
-    <img src="${img}" class="w-full aspect-video object-cover rounded-lg mb-2" alt="${name}">
-    <h4 class="text-lg font-semibold">${name}</h4>
-  </div>`).join('');
+    <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="${id}">
+      <img src="${img}" class="w-full aspect-video object-cover rounded-lg mb-2" alt="${name}">
+      <h4 class="text-lg font-semibold">${name}</h4>
+    </div>`).join('');
   cont.addEventListener("click",handleCardSelection);
 }
 
@@ -210,7 +213,9 @@ function handleCardSelection(e){
   const c=e.target.closest(".performer-card");if(!c)return;
   document.querySelectorAll(".performer-card").forEach(x=>x.classList.remove("selected"));
   c.classList.add("selected");
-  selectedVoteId=c.dataset.voteId;selectedVoteName=performers[selectedVoteId].name;selectedVoteImage=performers[selectedVoteId].img;
+  selectedVoteId=c.dataset.voteId;
+  selectedVoteName=performers[selectedVoteId].name;
+  selectedVoteImage=performers[selectedVoteId].img;
   const b=document.getElementById("submit-vote-btn");
   b.disabled=false;b.textContent=`Submit Vote for ${selectedVoteName}`;b.classList.add("ready");
   b.onclick=()=>submitVote();
@@ -225,8 +230,10 @@ async function submitVote(){
     const fRef=doc(db,"voted_fingerprints",deviceHash);
     const data={voteId:selectedVoteId,createdAt:Date.now(),userId,deviceHash,userName,voteSource:"online"};
     await runTransaction(db,async t=>{
-      const fp=await t.get(fRef);if(fp.exists())throw new Error("already");
-      t.set(vRef,data);t.set(fRef,{userId,voteId:selectedVoteId,createdAt:data.createdAt});
+      const fp=await t.get(fRef);
+      if(fp.exists())throw new Error("already");
+      t.set(vRef,data);
+      t.set(fRef,{userId,voteId:selectedVoteId,createdAt:data.createdAt,voteSource:"online"});
     });
     showConfirmation(selectedVoteName,selectedVoteImage);
   }catch(e){
@@ -243,11 +250,6 @@ function showConfirmation(name,img,already=false){
   document.getElementById("confirmation-message").innerHTML=
     already?`This device has already voted for <b>${name}</b>.<br><br>Thank you for joining Lip Sync 2025!`:
     `Your vote for <b>${name}</b> has been recorded.<br><br>Thank you for joining Lip Sync 2025!`;
-}
-
-function setScreen(id){
-  document.querySelectorAll(".screen").forEach(s=>s.classList.add("hidden"));
-  document.getElementById(id).classList.remove("hidden");
 }
 </script>
 </body>
