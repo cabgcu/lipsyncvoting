@@ -120,39 +120,15 @@ document.addEventListener("DOMContentLoaded",()=>initializeFirebase());
 
 async function initializeFirebase(){
   const app=initializeApp(firebaseConfig);
-  initializeAppCheck(app,{
-    provider:new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),
-    isTokenAutoRefreshEnabled:true
-  });
+  initializeAppCheck(app,{provider:new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),isTokenAutoRefreshEnabled:true});
   db=getFirestore(app);auth=getAuth(app);
 
-  // Force refresh for stale sessions
+  try{deviceHash=await generateDeviceHash();}catch{alert("Unable to verify device identity.");}
+
   onAuthStateChanged(auth,async(u)=>{
-    if(u){userId=u.uid;}
+    if(u){userId=u.uid;watchVotingStatus();}
     else await signInAnonymously(auth);
   });
-
-  deviceHash=await generateDeviceHash();
-  unlockContinueButton();
-
-  const sRef=doc(db,"lip_sync_2025_settings","state");
-  onSnapshot(sRef,(s)=>{
-    if(s.exists()){
-      votingEnabled=s.data().enabled;
-      if(!votingEnabled)closeVotingUI();
-    }
-  });
-}
-
-function closeVotingUI(){
-  const header=document.getElementById("voting-header");
-  const sub=document.getElementById("voting-subtext");
-  const cont=document.getElementById("performers-container");
-  const btn=document.getElementById("submit-vote-btn");
-  header.textContent="Voting Is Now Closed!";
-  sub.textContent="Thank you for joining Lip Sync: For Good!";
-  cont.innerHTML=`<div class='p-2'><img src='https://i.imgur.com/kWKvSbS.jpeg' class='vertical-image mx-auto' alt='Voting Closed'></div>`;
-  btn.disabled=true;btn.textContent="Voting Closed";
 }
 
 async function generateDeviceHash(){
@@ -178,22 +154,49 @@ function unlockContinueButton(){
   btn.addEventListener("click",handleContinue);
 }
 
+async function watchVotingStatus(){
+  const sRef=doc(db,"lip_sync_2025_settings","state");
+  onSnapshot(sRef,async(s)=>{
+    if(!s.exists())return;
+    votingEnabled=s.data().enabled;
+    if(!votingEnabled)return showVotingClosed();
+
+    // Check if this device already voted
+    const already=await checkExistingVote();
+    if(!already)unlockContinueButton();
+  });
+}
+
+async function checkExistingVote(){
+  const fRef=doc(db,"voted_fingerprints",deviceHash);
+  const fDoc=await getDoc(fRef);
+  if(fDoc.exists()){
+    const v=fDoc.data().voteId;
+    const p=performers[v];
+    showConfirmation(p.name,p.img,true);
+    return true;
+  }
+  return false;
+}
+
+function showVotingClosed(){
+  setScreen("voting-screen");
+  const header=document.getElementById("voting-header");
+  const sub=document.getElementById("voting-subtext");
+  const cont=document.getElementById("performers-container");
+  const btn=document.getElementById("submit-vote-btn");
+  header.textContent="Voting Is Now Closed!";
+  sub.textContent="Thank you for joining Lip Sync: For Good!";
+  cont.innerHTML=`<div class='p-2'><img src='https://i.imgur.com/kWKvSbS.jpeg' class='vertical-image mx-auto' alt='Voting Closed'></div>`;
+  btn.disabled=true;btn.textContent="Voting Closed";
+}
+
 async function handleContinue(){
   const n=document.getElementById("name-input").value.trim();
   if(!n)return alert("Please enter your name.");
   if(!votingEnabled)return alert("Voting is currently closed.");
   userName=n;
-  await restoreVoteOrShowVoting();
-}
-
-async function restoreVoteOrShowVoting(){
-  try{
-    const vSnap=await getDoc(doc(db,"voted_fingerprints",deviceHash));
-    if(vSnap.exists()){
-      const v=vSnap.data().voteId;const p=performers[v];
-      showConfirmation(p.name,p.img,true);
-    }else showVoting();
-  }catch{showVoting();}
+  showVoting();
 }
 
 function showVoting(){
