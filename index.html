@@ -124,27 +124,24 @@ const performers={
   option2:{name:"Deliverance",img:"https://firebasestorage.googleapis.com/v0/b/lip-sync-2025.firebasestorage.app/o/s7Unz9r%20-%20Imgur.jpg?alt=media&token=c8479380-c66d-4778-9ba2-36eb161a84de"},
   option3:{name:"Mask Off",img:"https://firebasestorage.googleapis.com/v0/b/lip-sync-2025.firebasestorage.app/o/x0BI8Mc%20-%20Imgur.jpg?alt=media&token=f2d1ab93-aa73-412e-b00e-a1cdef71d9ee"},
   option4:{name:"Metro Motion",img:"https://firebasestorage.googleapis.com/v0/b/lip-sync-2025.firebasestorage.app/o/4rG47gL%20-%20Imgur.jpg?alt=media&token=1262b438-78f8-4ca4-ba6e-69cb35a8edad"},
-  option5:{name:"Sin Game",img:"https://firebasestorage.googleapis.com/v0/b/lip-sync-2025.firebasestorage.app/o/k75mMUz%20-%20Imgur.jpg?alt=media&token=577a7b48-68e6-4171-ac7d-531ee35a8
-          531ee35b850e"},
+  option5:{name:"Sin Game",img:"https://firebasestorage.googleapis.com/v0/b/lip-sync-2025.firebasestorage.app/o/k75mMUz%20-%20Imgur.jpg?alt=media&token=577a7b48-68e6-4171-ac7d-531ee35a850e"},
   option6:{name:"Anonymity",img:"https://firebasestorage.googleapis.com/v0/b/lip-sync-2025.firebasestorage.app/o/3dJQFeX%20-%20Imgur.jpg?alt=media&token=dd2e317e-ac13-47eb-bd15-97f8491d4fc2"}
 };
 
 const closedImage="https://firebasestorage.googleapis.com/v0/b/lip-sync-2025.firebasestorage.app/o/kWKvSbS%20-%20Imgur.jpg?alt=media&token=f0e1f6a7-ddc9-46e1-9cef-7268031136c3";
 
-document.addEventListener("DOMContentLoaded", ()=> initializeFirebase());
+document.addEventListener("DOMContentLoaded",()=>initializeFirebase());
 
 async function initializeFirebase(){
-  const app = initializeApp(firebaseConfig);
-  initializeAppCheck(app,{ provider:new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'), isTokenAutoRefreshEnabled:true });
+  const app=initializeApp(firebaseConfig);
+  initializeAppCheck(app,{provider:new ReCaptchaV3Provider('6LdIDf8rAAAAAN29EDUYVkddlpw3QQy9ImSPFpm1'),isTokenAutoRefreshEnabled:true});
+  db=getFirestore(app);auth=getAuth(app);
 
-  db = getFirestore(app);
-  auth = getAuth(app);
-
-  onAuthStateChanged(auth, async (u)=>{
+  onAuthStateChanged(auth,async(u)=>{
     if(u){
-      userId = u.uid;
+      userId=u.uid;
 
-      // 🔒 NEW SAFE METHOD — each device uniquely identified by Firebase Anonymous UID
+      // NEW SAFE METHOD — deviceHash now equals Firebase anonymous UID
       deviceHash = userId;
 
       await checkVotingStatus();
@@ -155,176 +152,117 @@ async function initializeFirebase(){
 }
 
 async function checkVotingStatus(){
-  const sRef = doc(db,"lip_sync_2025_settings","state");
-
-  onSnapshot(sRef, async (s)=>{
-    if(!s.exists()) return;
-
-    votingEnabled = s.data().enabled;
-
-    if(!votingEnabled){
-      showVotingClosed();
-      return;
-    }
-
-    const already = await checkExistingVote();
-    if(!already){
-      unlockContinueButton();
-    }
+  const sRef=doc(db,"lip_sync_2025_settings","state");
+  onSnapshot(sRef,async(s)=>{
+    if(!s.exists())return;
+    votingEnabled=s.data().enabled;
+    if(!votingEnabled)return showVotingClosed();
+    const already=await checkExistingVote();
+    if(!already)unlockContinueButton();
   });
 }
 
 function setScreen(id){
-  document.querySelectorAll(".screen").forEach(s => s.classList.add("hidden"));
+  document.querySelectorAll(".screen").forEach(s=>s.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
 }
 
 function unlockContinueButton(){
-  const btn = document.getElementById("continue-btn");
+  const btn=document.getElementById("continue-btn");
   btn.classList.add("glow");
-  btn.innerHTML = "<span>Continue</span>";
-  btn.disabled = false;
+  btn.innerHTML="<span>Continue</span>";
+  btn.disabled=false;
   document.getElementById("header-logo").classList.remove("opacity-0");
-  btn.onclick = handleContinue;
+  btn.onclick=handleContinue;
 }
 
 async function checkExistingVote(){
-  const fRef = doc(db,"voted_fingerprints", deviceHash);
-  const fDoc = await getDoc(fRef);
+  const fRef=doc(db,"voted_fingerprints",deviceHash);
+  const fDoc=await getDoc(fRef);
 
   if(fDoc.exists()){
-    const v = fDoc.data().voteId;
-    const p = performers[v];
-
-    showConfirmation(p.name, p.img, true);
+    const v=fDoc.data().voteId;
+    const p=performers[v];
+    showConfirmation(p.name,p.img,true);
     return true;
   }
   return false;
 }
 
 async function handleContinue(){
-  const n = document.getElementById("name-input").value.trim();
-  if(!n){
-    alert("Please enter your name.");
-    return;
-  }
-  if(!votingEnabled){
-    alert("Voting is closed.");
-    return;
-  }
-
-  userName = n;
+  const n=document.getElementById("name-input").value.trim();
+  if(!n)return alert("Please enter your name.");
+  if(!votingEnabled)return alert("Voting is currently closed.");
+  userName=n;
   showVoting();
 }
 
 function showVoting(){
   setScreen("voting-screen");
-
-  const cont = document.getElementById("performers-container");
-  cont.innerHTML = Object.entries(performers).map(([id,{name,img}])=>`
+  const cont=document.getElementById("performers-container");
+  cont.innerHTML=Object.entries(performers).map(([id,{name,img}])=>`
     <div class="performer-card bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer" data-vote-id="${id}">
       <img src="${img}" class="w-full aspect-video object-cover rounded-lg mb-2" alt="${name}">
       <h4 class="text-lg font-semibold">${name}</h4>
-    </div>
-  `).join('');
-
-  cont.onclick = handleCardSelection;
+    </div>`).join('');
+  cont.onclick=handleCardSelection;
 }
 
-let selectedVoteId=null, selectedVoteName="", selectedVoteImage="";
+let selectedVoteId=null,selectedVoteName="",selectedVoteImage="";
 
 function handleCardSelection(e){
-  const c = e.target.closest(".performer-card");
-  if(!c) return;
-
-  document.querySelectorAll(".performer-card").forEach(x => x.classList.remove("selected"));
+  const c=e.target.closest(".performer-card");if(!c)return;
+  document.querySelectorAll(".performer-card").forEach(x=>x.classList.remove("selected"));
   c.classList.add("selected");
-
-  selectedVoteId = c.dataset.voteId;
-  selectedVoteName = performers[selectedVoteId].name;
-  selectedVoteImage = performers[selectedVoteId].img;
-
-  const b = document.getElementById("submit-vote-btn");
-  b.disabled = false;
-  b.textContent = `Submit Vote for ${selectedVoteName}`;
-  b.classList.add("ready");
-  b.onclick = ()=> submitVote();
+  selectedVoteId=c.dataset.voteId;
+  selectedVoteName=performers[selectedVoteId].name;
+  selectedVoteImage=performers[selectedVoteId].img;
+  const b=document.getElementById("submit-vote-btn");
+  b.disabled=false;b.textContent=`Submit Vote for ${selectedVoteName}`;b.classList.add("ready");
+  b.onclick=()=>submitVote();
 }
 
 async function submitVote(){
-  if(!deviceHash || !userId || !selectedVoteId){
-    alert("Something went wrong.");
-    return;
-  }
-
-  const btn = document.getElementById("submit-vote-btn");
-  btn.disabled = true;
-  btn.textContent = "Submitting...";
-
+  if(!deviceHash||!userId||!selectedVoteId)return;
+  const btn=document.getElementById("submit-vote-btn");
+  btn.disabled=true;btn.textContent="Submitting...";
   try{
-    const vRef = doc(db,"lip_sync_2025_votes", userId);
-    const fRef = doc(db,"voted_fingerprints", deviceHash);
-
-    const data = {
-      voteId: selectedVoteId,
-      createdAt: Date.now(),
-      userId,
-      deviceHash,
-      userName,
-      voteSource: "online"
-    };
-
-    await runTransaction(db, async t=>{
-      const fp = await t.get(fRef);
-
-      if(fp.exists()){
-        throw new Error("already");
-      }
-
-      t.set(vRef, data);
-      t.set(fRef, {
-        userId,
-        voteId: selectedVoteId,
-        createdAt: data.createdAt,
-        voteSource: "online"
-      });
+    const vRef=doc(db,"lip_sync_2025_votes",userId);
+    const fRef=doc(db,"voted_fingerprints",deviceHash);
+    const data={voteId:selectedVoteId,createdAt:Date.now(),userId,deviceHash,userName,voteSource:"online"};
+    await runTransaction(db,async t=>{
+      const fp=await t.get(fRef);
+      if(fp.exists())throw new Error("already");
+      t.set(vRef,data);
+      t.set(fRef,{userId,voteId:selectedVoteId,createdAt:data.createdAt,voteSource:"online"});
     });
-
-    showConfirmation(selectedVoteName, selectedVoteImage);
-
-  } catch(e){
-    if(e.message === "already"){
-      const p = performers[selectedVoteId];
-      showConfirmation(p.name, p.img, true);
-    } else {
-      alert("Error submitting vote. Please refresh.");
-    }
+    showConfirmation(selectedVoteName,selectedVoteImage);
+  }catch(e){
+    if(e.message==="already"){
+      const p=performers[selectedVoteId];
+      showConfirmation(p.name,p.img,true);
+    }else alert("Error submitting vote. Please refresh.");
   }
 }
 
 function showVotingClosed(){
   setScreen("voting-screen");
-
-  const header = document.getElementById("voting-header");
-  const sub = document.getElementById("voting-subtext");
-  const cont = document.getElementById("performers-container");
-  const btn = document.getElementById("submit-vote-btn");
-
-  header.textContent = "Voting Is Now Closed!";
-  sub.textContent = "Thank you for joining Lip Sync: For Good!";
-  cont.innerHTML = `<div class='p-2'><img src='${closedImage}' class='vertical-image mx-auto' alt='Voting Closed'></div>`;
-  btn.disabled = true;
-  btn.textContent = "Voting Closed";
+  const header=document.getElementById("voting-header");
+  const sub=document.getElementById("voting-subtext");
+  const cont=document.getElementById("performers-container");
+  const btn=document.getElementById("submit-vote-btn");
+  header.textContent="Voting Is Now Closed!";
+  sub.textContent="Thank you for joining Lip Sync: For Good!";
+  cont.innerHTML=`<div class='p-2'><img src='${closedImage}' class='vertical-image mx-auto' alt='Voting Closed'></div>`;
+  btn.disabled=true;btn.textContent="Voting Closed";
 }
 
-function showConfirmation(name, img, already=false){
+function showConfirmation(name,img,already=false){
   setScreen("confirmation-screen");
-
-  document.getElementById("confirmation-image").src = img;
-
-  document.getElementById("confirmation-message").innerHTML = already
-    ? `This device has already voted for <b>${name}</b>.<br><br>Thank you for joining Lip Sync 2025!`
-    : `Your vote for <b>${name}</b> has been recorded.<br><br>Thank you for joining Lip Sync 2025!`;
+  document.getElementById("confirmation-image").src=img;
+  document.getElementById("confirmation-message").innerHTML=
+    already?`This device has already voted for <b>${name}</b>.<br><br>Thank you for joining Lip Sync 2025!`:
+    `Your vote for <b>${name}</b> has been recorded.<br><br>Thank you for joining Lip Sync 2025!`;
 }
 </script>
 
